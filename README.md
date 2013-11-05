@@ -14,7 +14,7 @@ To run your tests, use:
 
     bundle exec rake test
 
-You may find the [http://guides.rubyonrails.org/testing.html](Rails testing) and [https://github.com/thoughtbot/factory_girl/blob/master/GETTING_STARTED.md](Factory Girl) guides useful.
+You may find the [Rails Testing](http://guides.rubyonrails.org/testing.html) and [Factory Girl](https://github.com/thoughtbot/factory_girl/blob/master/GETTING_STARTED.md) guides useful.
 
 ### Add a test for a new feature
 
