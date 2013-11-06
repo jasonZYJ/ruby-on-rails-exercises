@@ -2,82 +2,48 @@
 
 This set of exercises will lead you through building an app that allows a bicycle shop's employees to track orders for fulfilling custom bicycle orders.
 
-## Exercise Set 7
+## Exercise Set 8
 
-Once a large number of frames are loaded into the system, it can be tricky to find the right one when entering an order. Let's update the order form so that it has two selects, one for the brand and one for the frame. Once a brand is selected, we'll use javascript to populate the frame select.
+We've finally got the bike shop application in good enough shape to deploy it, so the shop can start tracking orders. However, before we put this application out on the public internet, we need a way to make sure that only bike shop employees can access it.
 
-### Make the lists of Frames available
+### Installing Devise
 
-First, we're going to need a way to retrieve the list of frames for a given brand. Let's start with a route: add `get 'frames'` to `resources :brands`, similarly to how Orders are customized.
+Devise is a gem that makes it relatively easy to add authentication to your Rails app. It's highly configurable, but the defaults are reasonably straightforward.
 
-Now we'll work on the controller. The following method will return all of the frames for a brand:
+Add `gem 'devise'` to your Gemfile, then run `bundle install`.
 
-```ruby
-def frames
-  @frames = Brand.find(params[:brand_id]).frames.order(:name)
-  render '/frames/index'
-end
-```
+Now that we have the Devise gem in our bundle, we need to modify our Rails application to make use of it. Devise adds a few new generators that will help start us on our way. Start by running `rails g devise:install`. 
 
-The last line of that method says that, rather than looking in the normal place for the View, use the existing index in `/app/view/frames/`. This saves us from having to write another view that does the same thing as an existing one.
+This will tell us about a few configuration changes we might need to make. In our bike shop app, we'll need to follow the third suggestion, adding 'notice' and 'alert' flash messages to our application layout. Open layouts/application.html.haml and, above the `yield` line, add
 
-With all of that in place, assuming you have a brand 1 in the database and that there are some frames that belong to it, you should be able to visit `http://localhost:3000/brands/1/frames` in your browser and see the list of frames.
+      %p#notice= notice
+      %p#alert= alert
 
-Handy, but that's not a very useful format for javascript to use. Add `.json` to the end of that URL, and you'll get a JSON representation of the same data.
+Indentation matters! These should be at the same level as `= yield`.
 
-We need to make one change to that JSON: right now, it returns the name of the frame and the brand id, but it doesn't return the frame's id (which we'll need to save on the Order). Open up `/app/views/frames/index.json.jbuilder` and add `:id` along with `:name` and `:brand_id`.
+We were already displaying `notice` in a few forms, so you should remove those lines to prevent double flash display. To find these preexisting instances, I ran `git grep notice app/views/`.
 
-### Update the Order model
+### Creating Employees
 
-Since completing Exercise 5, we've been able to say things like `@brand.orders`. However, we didn't hook up the other end of that association, so we can't say `@order.brand`. Let's fix that by adding an association to the order model: `has_one :brand, through: :frame`. While we're in that file, we're going to want to be able to access brand_id for the Order form, so add the following method:
+Now our app is ready to generate a Devise user. Simple apps might just call anyone who can log in a 'user', but it can also be the case that an app has, say, 'users' and 'admins', each of whom would have different abilities. Let's call the type of logins we're creating 'employees': `rails g devise employee`.
 
-```ruby
-def brand_id
-  brand ? brand.id : nil
-end
-```
+Take a look at what that generator just did: it created a migration, a new model, some tests, and a route. Depending on how one wishes to use Devise, it might be necessary to modify the migration to support certain features, such as required email confirmation. To keep things simple, we'll go with the default behavior, so go ahead and run `rake db:migrate`.
 
-### Add brands to the Order form
+If your server is already running, you should restart it now. Rails is pretty good about noticing changes to your app in development mode, but installing Devise is a big enough change that a restart is needed.
 
-Time to update the order form. First, we'll add the Haml to show the Brand. Above the existing Frame select, add:
+### Requiring Authentication
 
-```haml
-.field
-  = f.label :brand
-  = collection_select :order, :brand_id, Brand.all.order(:name), :id, :name, {}, { size: 10, data: { select: :brand } }
-```
+Now our app supports logging in and out, but doesn't require it. Since there isn't any public-facing part of this application, we'll add our requirement to the Application controller. Since all of our controllers inherit from the application controller, the requirement will apply to all of them. Open application_controller.rb and add `before_filter :authenticate_employee!`. Now try to access any page, and you should be presented with a login screen.
 
-Save the view, and load the order form in your browser. View source or use 'inspect element' to see what HTML is generated. The `data-select` attribute is going to come in handy soon.
+Because we didn't configure Devise to require account confirmation, anyone can simply click the 'sign up' link and create a new account. Obviously we'd want to change that in a real app, but this is close enough for our current purposes. Click 'sign up', create an account, and verify that everything works.
 
-Next, we'll change the Frame select. Currently, it selects a list of all Frames in the system. We want the form to just create enough HTML for our javascript to populate at the right time. Replace the existing collection_select with this:
+### Additional exercises
 
-```haml
-%select{id: :order_frame_id, size: 10, name: 'order[frame_id]', data: { select: :frame } }
-  %option Please select a brand
-```
+You may find [the Devise homepage](https://github.com/plataformatec/devise) helpful in completing these:
 
-Almost done! All we need to do now is to get that Frame list populated when a Brand is selected.
-
-### Javascript time!
-
-Well, coffeescript time, technically. Place the following in `app/assets/javascripts/orders.js.coffee`:
-
-```coffeescript
-$ ->
-  $('[data-select~=brand]').change (event) ->
-    brand_id = $(event.target).val()
-    $.get "/brands/#{brand_id}/frames.json", (data) ->
-      options = ''
-      if data.length == 0
-        options = '<option>No frames for that brand</option>'
-      else
-        for frame in data
-          options += "<option value='#{frame.id}'>#{frame.name}</option>"
-
-      $('[data-select~=frame]').html(options)
-```
-
-Reload the form, and select a Brand that has one or more Frames. You should be able to pick the frame and save the page, and everything should work.
+ * Right now, users can sign in, but then there's no way to sign out. When a user is logged in, display a link in the header that will sign them out.
+ * When someone is logged in, display their email address. This could be put in the same place as the 'sign out' link from the previous step.
+ * What would it take to configure devise so that people can't create their own accounts? If you make that change, how will the shop create accounts for new employees?
 
 ----
 
@@ -349,5 +315,83 @@ We’d like to make brands require a name — but don’t do it yet! We’re go
 * Run your tests to make sure that your new test fails as expected.
 * Change your code to implement the new behavior.
 * Run your tests again. They should pass!
+
+## Exercise Set 7
+
+Once a large number of frames are loaded into the system, it can be tricky to find the right one when entering an order. Let's update the order form so that it has two selects, one for the brand and one for the frame. Once a brand is selected, we'll use javascript to populate the frame select.
+
+### Make the lists of Frames available
+
+First, we're going to need a way to retrieve the list of frames for a given brand. Let's start with a route: add `get 'frames'` to `resources :brands`, similarly to how Orders are customized.
+
+Now we'll work on the controller. The following method will return all of the frames for a brand:
+
+```ruby
+def frames
+  @frames = Brand.find(params[:brand_id]).frames.order(:name)
+  render '/frames/index'
+end
+```
+
+The last line of that method says that, rather than looking in the normal place for the View, use the existing index in `/app/view/frames/`. This saves us from having to write another view that does the same thing as an existing one.
+
+With all of that in place, assuming you have a brand 1 in the database and that there are some frames that belong to it, you should be able to visit `http://localhost:3000/brands/1/frames` in your browser and see the list of frames.
+
+Handy, but that's not a very useful format for javascript to use. Add `.json` to the end of that URL, and you'll get a JSON representation of the same data.
+
+We need to make one change to that JSON: right now, it returns the name of the frame and the brand id, but it doesn't return the frame's id (which we'll need to save on the Order). Open up `/app/views/frames/index.json.jbuilder` and add `:id` along with `:name` and `:brand_id`.
+
+### Update the Order model
+
+Since completing Exercise 5, we've been able to say things like `@brand.orders`. However, we didn't hook up the other end of that association, so we can't say `@order.brand`. Let's fix that by adding an association to the order model: `has_one :brand, through: :frame`. While we're in that file, we're going to want to be able to access brand_id for the Order form, so add the following method:
+
+```ruby
+def brand_id
+  brand ? brand.id : nil
+end
+```
+
+### Add brands to the Order form
+
+Time to update the order form. First, we'll add the Haml to show the Brand. Above the existing Frame select, add:
+
+```haml
+.field
+  = f.label :brand
+  = collection_select :order, :brand_id, Brand.all.order(:name), :id, :name, {}, { size: 10, data: { select: :brand } }
+```
+
+Save the view, and load the order form in your browser. View source or use 'inspect element' to see what HTML is generated. The `data-select` attribute is going to come in handy soon.
+
+Next, we'll change the Frame select. Currently, it selects a list of all Frames in the system. We want the form to just create enough HTML for our javascript to populate at the right time. Replace the existing collection_select with this:
+
+```haml
+%select{id: :order_frame_id, size: 10, name: 'order[frame_id]', data: { select: :frame } }
+  %option Please select a brand
+```
+
+Almost done! All we need to do now is to get that Frame list populated when a Brand is selected.
+
+### Javascript time!
+
+Well, coffeescript time, technically. Place the following in `app/assets/javascripts/orders.js.coffee`:
+
+```coffeescript
+$ ->
+  $('[data-select~=brand]').change (event) ->
+    brand_id = $(event.target).val()
+    $.get "/brands/#{brand_id}/frames.json", (data) ->
+      options = ''
+      if data.length == 0
+        options = '<option>No frames for that brand</option>'
+      else
+        for frame in data
+          options += "<option value='#{frame.id}'>#{frame.name}</option>"
+
+      $('[data-select~=frame]').html(options)
+```
+
+Reload the form, and select a Brand that has one or more Frames. You should be able to pick the frame and save the page, and everything should work.
+
 
 ---
