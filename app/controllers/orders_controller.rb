@@ -63,15 +63,13 @@ class OrdersController < ApplicationController
 
   def mark_paid
     order = Order.find(params[:order_id])
-    order.paid_for_on = Time.now
-    order.save
+    order.pay!
     redirect_to orders_path, notice: 'Order marked as paid'
   end
 
   def mark_completed
     order = Order.find(params[:order_id])
-    order.completed_on = Time.now
-    order.save
+    order.complete!
     redirect_to orders_path, notice: 'Order marked as completed'
   end
 
