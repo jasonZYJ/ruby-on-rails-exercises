@@ -9,6 +9,11 @@ class Order < ActiveRecord::Base
   scope :unfinished, -> { where("completed_on is null") }
   
   belongs_to :frame
+  has_one :brand, through: :frame
+
+  def brand_id
+    brand ? brand.id : nil
+  end
 
   private
 
