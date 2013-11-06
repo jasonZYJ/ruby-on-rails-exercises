@@ -52,4 +52,38 @@ class OrdersControllerTest < ActionController::TestCase
 
     assert_redirected_to orders_path
   end
+
+  test "should marker order paid" do
+    assert_nil @order.paid_for_on
+    post :mark_paid, order_id: @order
+
+    @order.reload
+    assert_not_nil @order.paid_for_on
+  end
+
+  test "should marker order completed" do
+    assert_nil @order.completed_on
+    post :mark_completed, order_id: @order
+    
+    @order.reload
+    assert_not_nil @order.completed_on
+  end
+
+  test "should not allow directly setting paid_for_on" do
+    assert_date_field_not_updatable :paid_for_on
+  end
+
+  test "should not allow directly setting completed_on" do
+    assert_date_field_not_updatable :completed_on
+  end
+
+  private
+
+    def assert_date_field_not_updatable(field)
+      assert_nil @order.send(field)  # Sanity check: this test assumes date field is nil
+      patch :update, id: @order, order: { field => Time.now }
+
+      @order.reload
+      assert_nil @order.send(field), "Client directly updated #{field}"
+    end
 end
