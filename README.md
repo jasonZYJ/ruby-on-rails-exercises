@@ -2,48 +2,96 @@
 
 This set of exercises will lead you through building an app that allows a bicycle shop's employees to track orders for fulfilling custom bicycle orders.
 
-## Exercise Set 8
+## Exercise Set 9
 
-We've finally got the bike shop application in good enough shape to deploy it, so the shop can start tracking orders. However, before we put this application out on the public internet, we need a way to make sure that only bike shop employees can access it.
+The bike shop is sick of deadbeat customers who don’t pay for work, and careless employees messing with paid & completed dates in the admin interface. The shop has decided on some new policies:
 
-### Installing Devise
+1. Employees cannot edit `paid_for_on` and `completed_on` directly. Instead, when they click "Mark Paid" or "Mark Completed," it uses the current date.
+2. Each of those dates can only be set once, and then it can’t be changed.
+3. Orders must be paid up front. The work cannot be completed until the order is paid.
 
-Devise is a gem that makes it relatively easy to add authentication to your Rails app. It's highly configurable, but the defaults are reasonably straightforward.
+### Prevent direct editing of dates
 
-Add `gem 'devise'` to your Gemfile, then run `bundle install`.
+Merge this branch into you current work. If you haven't already added the upstream:
 
-Now that we have the Devise gem in our bundle, we need to modify our Rails application to make use of it. Devise adds a few new generators that will help start us on our way. Start by running `rails g devise:install`. 
+    git remote add upstream https://github.com/gosmartfactory/ruby-on-rails-exercises.git
 
-This will tell us about a few configuration changes we might need to make. In our bike shop app, we'll need to follow the third suggestion, adding 'notice' and 'alert' flash messages to our application layout. Open layouts/application.html.haml and, above the `yield` line, add
+Then:
 
-      %p#notice= notice
-      %p#alert= alert
+    git fetch upstream
+    git merge upstream/exercise_9_setup
 
-Indentation matters! These should be at the same level as `= yield`.
+This adds some new tests to `test/controllers/orders_controller_test.rb`. Take a look at that file. What do the new tests do?
 
-We were already displaying `notice` in a few forms, so you should remove those lines to prevent double flash display. To find these preexisting instances, I ran `git grep notice app/views/`.
+Run `rake test`. You will see that two of the tests are failling. That is because the controller allows the new and create actions to directly modify `paid_for_on` and `completed_on`. Change the controller so that it refuses to accept those parameters, and the tests pass.
 
-### Creating Employees
+Please note that **the controller tests are already correct, and you should not modify them**. It is the controller, not the tests, that you need to fix.
 
-Now our app is ready to generate a Devise user. Simple apps might just call anyone who can log in a 'user', but it can also be the case that an app has, say, 'users' and 'admins', each of whom would have different abilities. Let's call the type of logins we're creating 'employees': `rails g devise employee`.
+The order form still shows an editable field for `paid_for_on`. The controller won’t accept that any more, so delete the field from the UI.
 
-Take a look at what that generator just did: it created a migration, a new model, some tests, and a route. Depending on how one wishes to use Devise, it might be necessary to modify the migration to support certain features, such as required email confirmation. To keep things simple, we'll go with the default behavior, so go ahead and run `rake db:migrate`.
+When you get to this point, **stop** and check with your neighbor. If they’re still working on this phase of the exercise, show them what you did. Only proceed when you both have it working!
 
-If your server is already running, you should restart it now. Rails is pretty good about noticing changes to your app in development mode, but installing Devise is a big enough change that a restart is needed.
+### Create the order state machine
 
-### Requiring Authentication
+We’ve implemented new requirement 1. We could implement 2 and 3 with controller logic, but we’re going to take a more robust approach. It’s slight overkill for this immediate problem, but demonstrates a good approach when problems get complex.
 
-Now our app supports logging in and out, but doesn't require it. Since there isn't any public-facing part of this application, we'll add our requirement to the Application controller. Since all of our controllers inherit from the application controller, the requirement will apply to all of them. Open application_controller.rb and add `before_filter :authenticate_employee!`. Now try to access any page, and you should be presented with a login screen.
+We will add a new `state` field to orders. This is not user-editable; instead, it is governed by a state machine, which controls the order lifecycle. Orders start out in the `new` state, then transition to `paid`, then `completed` — always in that order, never going back.
 
-Because we didn't configure Devise to require account confirmation, anyone can simply click the 'sign up' link and create a new account. Obviously we'd want to change that in a real app, but this is close enough for our current purposes. Click 'sign up', create an account, and verify that everything works.
+There is a nice gem that adds state machine behavior to Rails. Add it to `Gemfile`:
 
-### Additional exercises
+    gem 'state_machine'
 
-You may find [the Devise homepage](https://github.com/plataformatec/devise) helpful in completing these:
+…and run `bundle install`. Now add a new migration to the project, with this content in the `change` method:
 
- * Right now, users can sign in, but then there's no way to sign out. When a user is logged in, display a link in the header that will sign them out.
- * When someone is logged in, display their email address. This could be put in the same place as the 'sign out' link from the previous step.
- * What would it take to configure devise so that people can't create their own accounts? If you make that change, how will the shop create accounts for new employees?
+    add_column :orders, :state, :string, null: false, default: 'new'
+
+Migrate your db. Orders now have states. The migration has set them all to new, which isn't necessarily correct: some of them may already have paid for and/or completed on dates. If this were production data, you’d have to clean that up — but it isn’t, so don’t worry about it!
+
+Now add state machine rules to `app/models/order.rb`:
+
+    state_machine :state, initial: :new do
+      state :new
+      state :paid
+      state :completed
+      
+      event :pay do
+        transition :new => :paid
+      end
+      
+      event :complete do
+        transition :paid => :completed
+      end
+      
+      after_transition any => :paid do |order|
+        order.paid_for_on = Time.now
+        order.save!
+      end
+      
+      after_transition any => :completed do |order|
+        order.completed_on = Time.now
+        order.save!
+      end
+    end
+
+Read through this chunk of code. Note that even though it is code, it’s quite possible to make sense of it — even if you’re unfamiliar with this particular gem. That’s the power of Ruby’s metaprogramming: the language has gained a new purpose-specific syntax for state machines, and your code stays elegant.
+
+This state machine declaration adds a bunch of new methods to orders. You can now say `order.paid?` to test whether it is in the paid state. You can say `order.pay!` to cause a transition to the paid state — and that will throw an exception if the order is already paid or completed, because the rules only allow a transition from new to paid. For more info, read the [state_machine docs](https://github.com/pluginaweek/state_machine).
+
+### Enforce the new rules
+
+You are now ready to implement the remaining requirements.
+
+You will find a commented-out test in `test/controllers/orders_controller_test.rb`. Uncomment it. It will fail.
+
+Change the `mark_paid` and `mark_completed` methods in `app/controllers/orders_controller.rb` so that they do _not_ directly set any dates, but instead use trigger state machine events to make the changes. (Hint #1: look at the two `event` declarations in the state machine. Hint #2: state machine events trigger a save, so you don’t have to explicitly save the order if you do it right.)
+
+Once you’ve made that change successfully, the tests will all pass.
+
+### Update the UI
+
+Add the order state to `app/views/orders/show.html.haml`.
+
+The orders index page shows "Mark Paid" and "Mark Completed" buttons even in situations where clicking those buttons would cause an error. Update the UI so it only shows the buttons in the appropriate state. (Hint: you may have some records in your DB where the paid and/or completed dates are set even though the order is in the "new" state. Make sure your view deals with that, and doesn’t blow up even if the dates are out of sync with the state.)
 
 ----
 
@@ -394,4 +442,45 @@ $ ->
 Reload the form, and select a Brand that has one or more Frames. You should be able to pick the frame and save the page, and everything should work.
 
 
----
+## Exercise Set 8
+
+We've finally got the bike shop application in good enough shape to deploy it, so the shop can start tracking orders. However, before we put this application out on the public internet, we need a way to make sure that only bike shop employees can access it.
+
+### Installing Devise
+
+Devise is a gem that makes it relatively easy to add authentication to your Rails app. It's highly configurable, but the defaults are reasonably straightforward.
+
+Add `gem 'devise'` to your Gemfile, then run `bundle install`.
+
+Now that we have the Devise gem in our bundle, we need to modify our Rails application to make use of it. Devise adds a few new generators that will help start us on our way. Start by running `rails g devise:install`. 
+
+This will tell us about a few configuration changes we might need to make. In our bike shop app, we'll need to follow the third suggestion, adding 'notice' and 'alert' flash messages to our application layout. Open layouts/application.html.haml and, above the `yield` line, add
+
+      %p#notice= notice
+      %p#alert= alert
+
+Indentation matters! These should be at the same level as `= yield`.
+
+We were already displaying `notice` in a few forms, so you should remove those lines to prevent double flash display. To find these preexisting instances, I ran `git grep notice app/views/`.
+
+### Creating Employees
+
+Now our app is ready to generate a Devise user. Simple apps might just call anyone who can log in a 'user', but it can also be the case that an app has, say, 'users' and 'admins', each of whom would have different abilities. Let's call the type of logins we're creating 'employees': `rails g devise employee`.
+
+Take a look at what that generator just did: it created a migration, a new model, some tests, and a route. Depending on how one wishes to use Devise, it might be necessary to modify the migration to support certain features, such as required email confirmation. To keep things simple, we'll go with the default behavior, so go ahead and run `rake db:migrate`.
+
+If your server is already running, you should restart it now. Rails is pretty good about noticing changes to your app in development mode, but installing Devise is a big enough change that a restart is needed.
+
+### Requiring Authentication
+
+Now our app supports logging in and out, but doesn't require it. Since there isn't any public-facing part of this application, we'll add our requirement to the Application controller. Since all of our controllers inherit from the application controller, the requirement will apply to all of them. Open application_controller.rb and add `before_filter :authenticate_employee!`. Now try to access any page, and you should be presented with a login screen.
+
+Because we didn't configure Devise to require account confirmation, anyone can simply click the 'sign up' link and create a new account. Obviously we'd want to change that in a real app, but this is close enough for our current purposes. Click 'sign up', create an account, and verify that everything works.
+
+### Additional exercises
+
+You may find [the Devise homepage](https://github.com/plataformatec/devise) helpful in completing these:
+
+ * Right now, users can sign in, but then there's no way to sign out. When a user is logged in, display a link in the header that will sign them out.
+ * When someone is logged in, display their email address. This could be put in the same place as the 'sign out' link from the previous step.
+ * What would it take to configure devise so that people can't create their own accounts? If you make that change, how will the shop create accounts for new employees?
