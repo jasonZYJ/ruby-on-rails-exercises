@@ -19,4 +19,8 @@
             = link_to "Frames", frames_path
           %li
             = link_to 'New Order', new_order_path, :class => "button new-order"
+
+      %p#notice= notice
+      %p#alert= alert
+
       = yield
