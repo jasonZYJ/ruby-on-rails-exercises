@@ -49,29 +49,31 @@ Migrate your db. Orders now have states. The migration has set them all to new, 
 
 Now add state machine rules to `app/models/order.rb`:
 
-    state_machine :state, initial: :new do
-      state :new
-      state :paid
-      state :completed
-      
-      event :pay do
-        transition :new => :paid
-      end
-      
-      event :complete do
-        transition :paid => :completed
-      end
-      
-      after_transition any => :paid do |order|
-        order.paid_for_on = Time.now
-        order.save!
-      end
-      
-      after_transition any => :completed do |order|
-        order.completed_on = Time.now
-        order.save!
-      end
-    end
+```ruby
+state_machine :state, initial: :new do
+  state :new
+  state :paid
+  state :completed
+
+  event :pay do
+    transition :new => :paid
+  end
+
+  event :complete do
+    transition :paid => :completed
+  end
+
+  after_transition any => :paid do |order|
+    order.paid_for_on = Time.now
+    order.save!
+  end
+
+  after_transition any => :completed do |order|
+    order.completed_on = Time.now
+    order.save!
+  end
+end
+```
 
 Read through this chunk of code. Note that even though it is code, it’s quite possible to make sense of it — even if you’re unfamiliar with this particular gem. That’s the power of Ruby’s metaprogramming: the language has gained a new purpose-specific syntax for state machines, and your code stays elegant.
 
