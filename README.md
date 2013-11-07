@@ -12,7 +12,7 @@ The bike shop is sick of deadbeat customers who don’t pay for work, and carele
 
 ### Prevent direct editing of dates
 
-Merge this branch into you current work. If you haven't already added the upstream:
+Merge this branch into your current work. If you haven't already added the upstream:
 
     git remote add upstream https://github.com/gosmartfactory/ruby-on-rails-exercises.git
 
