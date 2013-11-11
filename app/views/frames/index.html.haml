@@ -10,10 +10,7 @@
     %tr
       %td= frame.name
       %td= frame.brand.name if frame.brand
-      %td.actions
-        = link_to 'Show', frame, :class => 'button-small show'
-        = link_to 'Edit', edit_frame_path(frame), :class => 'button-small edit'
-        = link_to 'Destroy', frame, :method => :delete, :data => { :confirm => 'Are you sure?' }, :class => 'button-small delete'
+      = render 'shared/index_row_buttons', object: frame, edit_path: edit_frame_path(frame)
 
 %br
 

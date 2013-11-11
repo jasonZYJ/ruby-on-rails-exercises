@@ -8,10 +8,7 @@
   - @brands.each do |brand|
     %tr
       %td= brand.name
-      %td.actions
-        = link_to 'Show', brand, :class => 'button-small show'
-        = link_to 'Edit', edit_brand_path(brand), :class => 'button-small edit'
-        = link_to 'Destroy', brand, :method => :delete, :data => { :confirm => 'Are you sure?' }, :class => 'button-small delete'
+      = render 'shared/index_row_buttons', object: brand, edit_path: edit_brand_path(brand)
 
 %br
 
