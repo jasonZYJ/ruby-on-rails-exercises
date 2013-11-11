@@ -63,8 +63,7 @@ class OrdersControllerTest < ActionController::TestCase
   end
 
   test "should marker order completed" do
-    @order.paid_for_on = Time.now
-    @order.save!
+    @order.pay!
     post :mark_completed, order_id: @order
     
     @order.reload
