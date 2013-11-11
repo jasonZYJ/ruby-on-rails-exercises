@@ -2,6 +2,7 @@ require 'test_helper'
 
 class FramesControllerTest < ActionController::TestCase
   setup do
+    sign_in FactoryGirl.create(:employee)
     @frame = FactoryGirl.create(:frame)
   end
 
