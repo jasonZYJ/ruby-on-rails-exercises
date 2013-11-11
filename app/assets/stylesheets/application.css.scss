@@ -70,13 +70,13 @@ header {
   right: 10px;
   a.new-order {
     vertical-align: top;
-    background: #187db1 url(../assets/sprite.png) no-repeat 83px 12px;
+    background: #187db1 url(image-path('sprite.png')) no-repeat 83px 12px;
     padding-right: 35px;
     color: #fff;
   }
   a.new-order:hover {
     color: #fff;
-    background: #0B4D70 url(../assets/sprite.png) no-repeat 83px 12px;
+    background: #0B4D70 url(image-path('sprite.png')) no-repeat 83px 12px;
   }
   ul {
     margin: 0;
@@ -167,7 +167,7 @@ td.actions {
   text-indent: 100%;
   overflow: hidden;
   border-radius: 4px;
-  background: url(../assets/sprite.png) no-repeat 8px -21px #ddd;
+  background: url(image-path('sprite.png')) no-repeat 8px -21px #ddd;
   &:hover {
     color: #666;
     background-color: #ccc;
