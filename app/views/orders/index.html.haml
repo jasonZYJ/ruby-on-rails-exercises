@@ -23,13 +23,13 @@
           - if order.new?
             = link_to 'Mark Paid', order_mark_paid_path(order), method: :post, data: { :confirm => 'Are you sure?' }, :class => 'button'
           - elsif order.paid_for_on?
-            = order.paid_for_on.strftime('%b %d, %Y')
+            = admin_date_format order.paid_for_on
         %td.center
           - if order.paid?
             = link_to 'Mark Completed', order_mark_completed_path(order), method: :post, data: { :confirm => 'Are you sure?' }, :class => 'button'
           - elsif order.completed_on?
-            = order.completed_on.strftime('%b %d, %Y')
         %td.actions
           = link_to 'Show', order, :class => 'button-small show'
           = link_to 'Edit', edit_order_path(order), :class => 'button-small edit'
           = link_to 'Destroy', order, method: :delete, data: { :confirm => 'Are you sure?' }, :class => 'button-small delete'
+            = admin_date_format order.completed_on

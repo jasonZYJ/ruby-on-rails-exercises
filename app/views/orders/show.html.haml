@@ -20,10 +20,10 @@
   = @order.state
 %p
   %b Paid for on:
-  = @order.paid_for_on
+  = admin_date_format @order.paid_for_on
 %p
   %b Completed on:
-  = @order.completed_on
+  = admin_date_format @order.completed_on
 
 = link_to 'Edit', edit_order_path(@order)
 \|

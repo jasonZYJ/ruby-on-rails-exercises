@@ -8,7 +8,7 @@
       = link_to order.customer_name, order
       = order.frame.name
       on
-      = order.created_at
+      = admin_date_format order.created_at
 
 = link_to 'Edit', edit_brand_path(@brand)
 \|
