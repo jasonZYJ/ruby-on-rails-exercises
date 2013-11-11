@@ -405,7 +405,6 @@ $ ->
 
 Reload the form, and select a Brand that has one or more Frames. You should be able to pick the frame and save the page, and everything should work.
 
-
 ## Exercise Set 8
 
 We've finally got the bike shop application in good enough shape to deploy it, so the shop can start tracking orders. However, before we put this application out on the public internet, we need a way to make sure that only bike shop employees can access it.

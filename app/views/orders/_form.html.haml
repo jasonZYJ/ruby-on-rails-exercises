@@ -12,14 +12,15 @@
   = f.label :customer_email
   = f.text_field :customer_email
 .field
+  = f.label :brand
+  = collection_select :order, :brand_id, Brand.all.order(:name), :id, :name, {}, { size: 10, data: { select: :brand } }
+.field
   = f.label :frame
-  = collection_select :order, :frame_id, Frame.all, :id, :name
+  %select{id: :order_frame_id, size: 10, name: 'order[frame_id]', data: { select: :frame } }
+    %option Please select a brand
 .field
   = f.label :description
   = f.text_area :description
 .field
   = f.label :price
   = f.text_field :price
-.field
-  = f.label :paid_for_on
-  = f.text_field :paid_for_on

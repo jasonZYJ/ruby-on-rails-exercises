@@ -9,6 +9,36 @@ class Order < ActiveRecord::Base
   scope :unfinished, -> { where("completed_on is null") }
   
   belongs_to :frame
+  has_one :brand, through: :frame
+
+  def brand_id
+    brand ? brand.id : nil
+  end
+
+  state_machine :state, initial: :new do
+    state :new
+    state :paid
+    state :completed
+    
+    event :pay do
+      transition :new => :paid
+    end
+    
+    event :complete do
+      transition :paid => :completed
+    end
+    
+    after_transition any => :paid do |order|
+      order.paid_for_on = Time.now
+      order.save!
+    end
+    
+    after_transition any => :completed do |order|
+      order.completed_on = Time.now
+      order.save!
+    end
+  end
+
 
   private
 

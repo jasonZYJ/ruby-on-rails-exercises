@@ -20,15 +20,15 @@
         %td= order.description
         %td= number_to_currency(order.price)
         %td.center
-          - if order.completed_on.blank?
-            = link_to 'Mark Completed', order_mark_completed_path(order), method: :post, data: { :confirm => 'Are you sure?' }, :class => 'button'
-          - else
-            = order.completed_on.strftime('%b %d, %Y')
-        %td.center
-          - if order.paid_for_on.blank?
+          - if order.new?
             = link_to 'Mark Paid', order_mark_paid_path(order), method: :post, data: { :confirm => 'Are you sure?' }, :class => 'button'
-          - else 
+          - elsif order.paid_for_on?
             = order.paid_for_on.strftime('%b %d, %Y')
+        %td.center
+          - if order.paid?
+            = link_to 'Mark Completed', order_mark_completed_path(order), method: :post, data: { :confirm => 'Are you sure?' }, :class => 'button'
+          - elsif order.completed_on?
+            = order.completed_on.strftime('%b %d, %Y')
         %td.actions
           = link_to 'Show', order, :class => 'button-small show'
           = link_to 'Edit', edit_order_path(order), :class => 'button-small edit'

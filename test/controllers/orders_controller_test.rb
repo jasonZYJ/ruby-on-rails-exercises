@@ -2,6 +2,7 @@ require 'test_helper'
 
 class OrdersControllerTest < ActionController::TestCase
   setup do
+    sign_in FactoryGirl.create(:employee)
     @order = FactoryGirl.create(:order)
   end
 
@@ -62,24 +63,21 @@ class OrdersControllerTest < ActionController::TestCase
   end
 
   test "should marker order completed" do
-    @order.paid_for_on = Time.now
-    @order.save!
+    @order.pay!
     post :mark_completed, order_id: @order
     
     @order.reload
     assert_not_nil @order.completed_on
   end
 
-  # You will uncomment this test for the second part of the exercise:
-
-  # test "should not mark order completed if it is not paid" do
-  #   assert_raise(StateMachine::InvalidTransition) do
-  #     post :mark_completed, order_id: @order
-  #   end
-  #    
-  #   @order.reload
-  #   assert_nil @order.completed_on
-  # end
+  test "should not mark order completed if it is not paid" do
+    assert_raise(StateMachine::InvalidTransition) do
+      post :mark_completed, order_id: @order
+    end
+     
+    @order.reload
+    assert_nil @order.completed_on
+  end
 
   test "should not allow directly setting paid_for_on" do
     assert_date_field_not_updatable :paid_for_on

@@ -63,15 +63,13 @@ class OrdersController < ApplicationController
 
   def mark_paid
     order = Order.find(params[:order_id])
-    order.paid_for_on = Time.now
-    order.save
+    order.pay!
     redirect_to orders_path, notice: 'Order marked as paid'
   end
 
   def mark_completed
     order = Order.find(params[:order_id])
-    order.completed_on = Time.now
-    order.save
+    order.complete!
     redirect_to orders_path, notice: 'Order marked as completed'
   end
 
@@ -84,6 +82,6 @@ class OrdersController < ApplicationController
 
     # Never trust parameters from the scary internet, only allow the white list through.
     def order_params
-      params.require(:order).permit(:customer_name, :completed_on, :customer_email, :description, :price, :paid_for_on, :frame_id)
+      params.require(:order).permit(:customer_name, :customer_email, :description, :price, :frame_id)
     end
 end
