@@ -2,6 +2,7 @@ require 'test_helper'
 
 class BrandsControllerTest < ActionController::TestCase
   setup do
+    sign_in FactoryGirl.create(:employee)
     @brand = FactoryGirl.create(:brand)
   end
 
