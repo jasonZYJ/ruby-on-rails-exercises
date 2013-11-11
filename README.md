@@ -2,71 +2,60 @@
 
 This set of exercises will lead you through building an app that allows a bicycle shop's employees to track orders for fulfilling custom bicycle orders.
 
-## Exercise Set 10
+## Exercise Set 11
 
-Our customer has signed off, and it's time to deploy. We'll host our app at Heroku, because it's widely used, pretty straightforward, and free for the minimal resources we'll be using.
+In this last exercise, we’ll look at a few of the options Rails gives you for factoring redundant code out of your app.
 
-### Basic Heroku Account and Tools
+### Date formatting (refactoring using helper methods)
 
-You should already have a Heroku account. If not, visit [Heroku](https://heroku.com) and create one, using the same email address you're using for github (this will allow your git client to work).
+Several of our views display dates:
 
-If you enter `heroku` on your command line and see 'command not found', you probably need to install the [Heroku Toolbelt](https://toolbelt.heroku.com/). Once that's done, run `heroku login` to get signed in from the command line.
+ * `app/views/brands/show.html.haml`
+ * `app/views/orders/index.html.haml`
+ * `app/views/orders/show.html.haml`
 
-### Configuring your app
+…but they don’t display them consistently. Some use a short format (“Nov 11, 2013”); others use the full default format (“2013-11-11 20:51:37 UTC”).
 
-We need to add a few gems to our Gemfile. Since these are only needed for production, we'll put them in a block that only gets loaded in the production environment:
+Our customer likes the short format better. Change all the views listed above so they all use the short format. (Note that in some cases, you will have to handle nil dates!)
 
-```ruby
-group :production do
-  gem 'rails_12factor'
-  gem 'pg'
-  gem 'unicorn'
-end
-```
+You’ll end up copying and pasting that `strftime` call all over those views. It doesn’t feel good! Remember, Rails aesthetics abhor senseless repetition.
 
-Those gems, in order,
+Instead of calling `strftime` all over the place, we can create a single helper method available to all the views.
 
-  1. make a few config changes needed for logging and assets on Heroku,
-  2. tell the app to use Heroku's Postgresql database, instead of the Sqlite3 we've been using in development,
-  3. change the app's HTTP server from the development-only Webrick to Unicorn, the standard on Heroku.
+ * Edit `app/helpers/application_helper.rb`.
+ * Add a new method named `admin_date_format`, using Ruby’s normal `def` syntax. This new method will be available to all your views.
+ * Make the new method accept one parameter, `date`, and return a formatted string using `strftime` if the parameter is not nil.
+ * Now replace all those redundant date formatting calls and nil checks in your views with calls to your helper method.
 
-We also need to move the sqlite3 gem into a :development block, because it can't be built on Heroku.
+### Admin buttons (refactoring using partials)
 
-Even though we don't need to run the production-only gems locally, we do need to run `bundle install` to update the Gemfile.lock, which Heroku will use when we deploy.
+Our app has three index views, all of which share a chunk of code that looks like this:
 
-Changing our server to Unicorn requires a few other changes:
+    %td.actions
+      = link_to 'Show', ••••••, :class => 'button-small show'
+      = link_to 'Edit', edit_••••••_path(••••••), :class => 'button-small edit'
+      = link_to 'Destroy', ••••••, :method => :delete, :data => { :confirm => 'Are you sure?' }, :class => 'button-small delete'
 
-  1. we need one new configuration file, which we'll call `config/unicorn.rb`. Go to [Heroku's Unicorn docs](https://devcenter.heroku.com/articles/rails-unicorn#adding-unicorn-to-your-application) and copy their example.
-  2. we need another new file to tell Heroku how to start the Unicorn server. This will be called `Procfile` and belongs in the app's root directory. It can just say `web: bundle exec unicorn -p $PORT -c ./config/unicorn.rb`
+Whenever you have a fragment of repeated view code, you can pull it into a _partial_. You’ve already used partials — that’s what all the `_form` views are — but scaffolding generated those for you. You’ll now create your own.
 
-### Getting everything straight in Git
+Create a new file, `app/views/shared/_index_row_buttons.html.haml`. The filename starts with an underscore because it is a partial. It goes under `shared` because the partial is shared across controllers.
 
-We tell Heroku to deploy our app by using git. For this to work, we'll need to make sure our local repository is in the right shape. Type `git status` to see what needs to be done:
+Copy that action link block out of any one of the three existing index views — including the `td` tag and the three links — and paste it into the new partial. Two pieces of that code are specific to the particular index you’re showing, so you will have to make them inputs: the model object itself (e.g. `brand`), and the edit path for that object (e.g. `edit_brand_path(brand)`). In the partial, replace those with generic names:
 
-At the very least, the two new files we just created should show up under the *Untracked files* heading. You can tell git to track those files by entering `git add Procfile config` (git will then add all unadded files in the config directory). If you have other files that need to be tracked, add them the same way.
+ * `brand`   →   `object`
+ * `edit_brand_path(brand)`   →   `edit_path`
 
-Now you're ready to run `git commit -a`, which will commit all your pending changes to the git repository. You'll be prompted to enter a message. Something like *Ready to push to Heroku* would probably make sense.
+Now, in the three index views, replace the whole action block with a call to the partial, providing the necessary inputs, e.g.:
 
-### Creating the app in Heroku, and pushing our code
+    = render 'shared/index_row_buttons', object: brand, edit_path: edit_brand_path(brand)
 
-Time to go live!
+This will take some experimenting to get it all working — but it will feel so nice when you’re done!
 
-First, run `heroku create` to let Heroku know that we have a new app to deploy. Note the random app name & URL Heroku supplies (those can be changed, if you want). That command will also give us a new git remote called *heroku*.
+Challenges:
 
-Push the code from our repository to the app: `git push heroku yourbranch:master`, where *yourbranch* is the name of the branch you're on. You can find that out from `git branch`. Heroku will show you what it's doing while the deploy is running. This usually takes a minute or two.
-
-Once the deploy has succeeded, we need to run migrations on Heroku to create the initial database. Do this via `heroku run rake db:migrate`.
-
-Your app should finally be ready. Either run `heroku open` to see the app in your default browser (at least on OS X), or just enter the custom URL into your browser. If you've forgotten it, `heroku info` will display the URL, along with some other information.
-
-### Fixing the path to the sprites
-
-Almost everything should look good, except that the navigation images aren't showing up. To fix this, open up `app/assets/stylesheets/application.css.scss`. Change the *background* lines referring to *sprite.png* so that they use Rails's image-path helper, eg. `background: url(image-path('sprite.png')) no-repeat 8px -21px #ddd;`. Then commit the change (`git commit -a` again), and use the same `git push` command you used before. Reload the Heroku app, and the images should be working.
-
-### Additional challenges
- * Heroku offers a huge number of additional services, via [add-ons](https://addons.heroku.com/). One very useful add-on is New Relic, which keeps track of performance and errors. Try out the free version (options go up to $1649/month, so don't pick the wrong one by mistake!)
- * The shop manager would like to be notified of every new order. Let's modify the Order *create* method to send an email notification on every successful call (see [the Action Mailer guide for help](http://guides.rubyonrails.org/action_mailer_basics.html)). For now, you could just have the emails delivered to your own account.
- * A problem with sending email as part of a web request is that it can make the response quite a bit slower. In production apps, we handle this by adding emails to a background process, instead of sending them directly from our controllers. There are a few ways to do this, but one of the simplest is [Delayed Job](https://devcenter.heroku.com/articles/delayed-job). Note that actually running Delayed Job on Heroku will require adding a Heroku *worker process*. You should be able to turn a worker process on briefly to verify that everything's working, but leaving a worker process running will cause Heroku to bill you!
+ * Look for other things in your app that can be refactored.
+ * Add controller tests that make sure that your refactoring works. See the [Rails view testing guide](http://guides.rubyonrails.org/testing.html#testing-views) for help.
+ * Difficult: Use Ruby metaprogramming to make your partial accept only the name of the model as symbol (e.g. `:brand`), and fetch the appropriate object and edit path itself.
 
 ----
 
@@ -596,3 +585,69 @@ state_machine :state, initial: :new do
   end
 end
 ```
+
+## Exercise Set 10
+
+Our customer has signed off, and it's time to deploy. We'll host our app at Heroku, because it's widely used, pretty straightforward, and free for the minimal resources we'll be using.
+
+### Basic Heroku Account and Tools
+
+You should already have a Heroku account. If not, visit [Heroku](https://heroku.com) and create one, using the same email address you're using for github (this will allow your git client to work).
+
+If you enter `heroku` on your command line and see 'command not found', you probably need to install the [Heroku Toolbelt](https://toolbelt.heroku.com/). Once that's done, run `heroku login` to get signed in from the command line.
+
+### Configuring your app
+
+We need to add a few gems to our Gemfile. Since these are only needed for production, we'll put them in a block that only gets loaded in the production environment:
+
+```ruby
+group :production do
+  gem 'rails_12factor'
+  gem 'pg'
+  gem 'unicorn'
+end
+```
+
+Those gems, in order,
+
+  1. make a few config changes needed for logging and assets on Heroku,
+  2. tell the app to use Heroku's Postgresql database, instead of the Sqlite3 we've been using in development,
+  3. change the app's HTTP server from the development-only Webrick to Unicorn, the standard on Heroku.
+
+We also need to move the sqlite3 gem into a :development block, because it can't be built on Heroku.
+
+Even though we don't need to run the production-only gems locally, we do need to run `bundle install` to update the Gemfile.lock, which Heroku will use when we deploy.
+
+Changing our server to Unicorn requires a few other changes:
+
+  1. we need one new configuration file, which we'll call `config/unicorn.rb`. Go to [Heroku's Unicorn docs](https://devcenter.heroku.com/articles/rails-unicorn#adding-unicorn-to-your-application) and copy their example.
+  2. we need another new file to tell Heroku how to start the Unicorn server. This will be called `Procfile` and belongs in the app's root directory. It can just say `web: bundle exec unicorn -p $PORT -c ./config/unicorn.rb`
+
+### Getting everything straight in Git
+
+We tell Heroku to deploy our app by using git. For this to work, we'll need to make sure our local repository is in the right shape. Type `git status` to see what needs to be done:
+
+At the very least, the two new files we just created should show up under the *Untracked files* heading. You can tell git to track those files by entering `git add Procfile config` (git will then add all unadded files in the config directory). If you have other files that need to be tracked, add them the same way.
+
+Now you're ready to run `git commit -a`, which will commit all your pending changes to the git repository. You'll be prompted to enter a message. Something like *Ready to push to Heroku* would probably make sense.
+
+### Creating the app in Heroku, and pushing our code
+
+Time to go live!
+
+First, run `heroku create` to let Heroku know that we have a new app to deploy. Note the random app name & URL Heroku supplies (those can be changed, if you want). That command will also give us a new git remote called *heroku*.
+
+Push the code from our repository to the app: `git push heroku yourbranch:master`, where *yourbranch* is the name of the branch you're on. You can find that out from `git branch`. Heroku will show you what it's doing while the deploy is running. This usually takes a minute or two.
+
+Once the deploy has succeeded, we need to run migrations on Heroku to create the initial database. Do this via `heroku run rake db:migrate`.
+
+Your app should finally be ready. Either run `heroku open` to see the app in your default browser (at least on OS X), or just enter the custom URL into your browser. If you've forgotten it, `heroku info` will display the URL, along with some other information.
+
+### Fixing the path to the sprites
+
+Almost everything should look good, except that the navigation images aren't showing up. To fix this, open up `app/assets/stylesheets/application.css.scss`. Change the *background* lines referring to *sprite.png* so that they use Rails's image-path helper, eg. `background: url(image-path('sprite.png')) no-repeat 8px -21px #ddd;`. Then commit the change (`git commit -a` again), and use the same `git push` command you used before. Reload the Heroku app, and the images should be working.
+
+### Additional challenges
+ * Heroku offers a huge number of additional services, via [add-ons](https://addons.heroku.com/). One very useful add-on is New Relic, which keeps track of performance and errors. Try out the free version (options go up to $1649/month, so don't pick the wrong one by mistake!)
+ * The shop manager would like to be notified of every new order. Let's modify the Order *create* method to send an email notification on every successful call (see [the Action Mailer guide for help](http://guides.rubyonrails.org/action_mailer_basics.html)). For now, you could just have the emails delivered to your own account.
+ * A problem with sending email as part of a web request is that it can make the response quite a bit slower. In production apps, we handle this by adding emails to a background process, instead of sending them directly from our controllers. There are a few ways to do this, but one of the simplest is [Delayed Job](https://devcenter.heroku.com/articles/delayed-job). Note that actually running Delayed Job on Heroku will require adding a Heroku *worker process*. You should be able to turn a worker process on briefly to verify that everything's working, but leaving a worker process running will cause Heroku to bill you!
