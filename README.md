@@ -2,98 +2,71 @@
 
 This set of exercises will lead you through building an app that allows a bicycle shop's employees to track orders for fulfilling custom bicycle orders.
 
-## Exercise Set 9
+## Exercise Set 10
 
-The bike shop is sick of deadbeat customers who don’t pay for work, and careless employees messing with paid & completed dates in the admin interface. The shop has decided on some new policies:
+Our customer has signed off, and it's time to deploy. We'll host our app at Heroku, because it's widely used, pretty straightforward, and free for the minimal resources we'll be using.
 
-1. Employees cannot edit `paid_for_on` and `completed_on` directly. Instead, when they click "Mark Paid" or "Mark Completed," it uses the current date.
-2. Each of those dates can only be set once, and then it can’t be changed.
-3. Orders must be paid up front. The work cannot be completed until the order is paid.
+### Basic Heroku Account and Tools
 
-### Prevent direct editing of dates
+You should already have a Heroku account. If not, visit [Heroku](https://heroku.com) and create one, using the same email address you're using for github (this will allow your git client to work).
 
-Merge this branch into you current work. If you haven't already added the upstream:
+If you enter `heroku` on your command line and see 'command not found', you probably need to install the [Heroku Toolbelt](https://toolbelt.heroku.com/). Once that's done, run `heroku login` to get signed in from the command line.
 
-    git remote add upstream https://github.com/gosmartfactory/ruby-on-rails-exercises.git
+### Configuring your app
 
-Then:
-
-    git fetch upstream
-    git merge upstream/exercise_9_setup
-
-This adds some new tests to `test/controllers/orders_controller_test.rb`. Take a look at that file. What do the new tests do?
-
-Run `rake test`. You will see that two of the tests are failling. That is because the controller allows the new and create actions to directly modify `paid_for_on` and `completed_on`. Change the controller so that it refuses to accept those parameters, and the tests pass.
-
-Please note that **the controller tests are already correct, and you should not modify them**. It is the controller, not the tests, that you need to fix.
-
-The order form still shows an editable field for `paid_for_on`. The controller won’t accept that any more, so delete the field from the UI.
-
-When you get to this point, **stop** and check with your neighbor. If they’re still working on this phase of the exercise, show them what you did. Only proceed when you both have it working!
-
-### Create the order state machine
-
-We’ve implemented new requirement 1. We could implement 2 and 3 with controller logic, but we’re going to take a more robust approach. It’s slight overkill for this immediate problem, but demonstrates a good approach when problems get complex.
-
-We will add a new `state` field to orders. This is not user-editable; instead, it is governed by a state machine, which controls the order lifecycle. Orders start out in the `new` state, then transition to `paid`, then `completed` — always in that order, never going back.
-
-There is a nice gem that adds state machine behavior to Rails. Add it to `Gemfile`:
-
-    gem 'state_machine'
-
-…and run `bundle install`. Now add a new migration to the project, with this content in the `change` method:
-
-    add_column :orders, :state, :string, null: false, default: 'new'
-
-Migrate your db. Orders now have states. The migration has set them all to new, which isn't necessarily correct: some of them may already have paid for and/or completed on dates. If this were production data, you’d have to clean that up — but it isn’t, so don’t worry about it!
-
-Now add state machine rules to `app/models/order.rb`:
+We need to add a few gems to our Gemfile. Since these are only needed for production, we'll put them in a block that only gets loaded in the production environment:
 
 ```ruby
-state_machine :state, initial: :new do
-  state :new
-  state :paid
-  state :completed
-
-  event :pay do
-    transition :new => :paid
-  end
-
-  event :complete do
-    transition :paid => :completed
-  end
-
-  after_transition any => :paid do |order|
-    order.paid_for_on = Time.now
-    order.save!
-  end
-
-  after_transition any => :completed do |order|
-    order.completed_on = Time.now
-    order.save!
-  end
+group :production do
+  gem 'rails_12factor'
+  gem 'pg'
+  gem 'unicorn'
 end
 ```
 
-Read through this chunk of code. Note that even though it is code, it’s quite possible to make sense of it — even if you’re unfamiliar with this particular gem. That’s the power of Ruby’s metaprogramming: the language has gained a new purpose-specific syntax for state machines, and your code stays elegant.
+Those gems, in order,
 
-This state machine declaration adds a bunch of new methods to orders. You can now say `order.paid?` to test whether it is in the paid state. You can say `order.pay!` to cause a transition to the paid state — and that will throw an exception if the order is already paid or completed, because the rules only allow a transition from new to paid. For more info, read the [state_machine docs](https://github.com/pluginaweek/state_machine).
+  1. make a few config changes needed for logging and assets on Heroku,
+  2. tell the app to use Heroku's Postgresql database, instead of the Sqlite3 we've been using in development,
+  3. change the app's HTTP server from the development-only Webrick to Unicorn, the standard on Heroku.
 
-### Enforce the new rules
+We also need to move the sqlite3 gem into a :development block, because it can't be built on Heroku.
 
-You are now ready to implement the remaining requirements.
+Even though we don't need to run the production-only gems locally, we do need to run `bundle install` to update the Gemfile.lock, which Heroku will use when we deploy.
 
-You will find a commented-out test in `test/controllers/orders_controller_test.rb`. Uncomment it. It will fail.
+Changing our server to Unicorn requires a few other changes:
 
-Change the `mark_paid` and `mark_completed` methods in `app/controllers/orders_controller.rb` so that they do _not_ directly set any dates, but instead use trigger state machine events to make the changes. (Hint #1: look at the two `event` declarations in the state machine. Hint #2: state machine events trigger a save, so you don’t have to explicitly save the order if you do it right.)
+  1. we need one new configuration file, which we'll call `config/unicorn.rb`. Go to [Heroku's Unicorn docs](https://devcenter.heroku.com/articles/rails-unicorn#adding-unicorn-to-your-application) and copy their example.
+  2. we need another new file to tell Heroku how to start the Unicorn server. This will be called `Procfile` and belongs in the app's root directory. It can just say `web: bundle exec unicorn -p $PORT -c ./config/unicorn.rb`
 
-Once you’ve made that change successfully, the tests will all pass.
+### Getting everything straight in Git
 
-### Update the UI
+We tell Heroku to deploy our app by using git. For this to work, we'll need to make sure our local repository is in the right shape. Type `git status` to see what needs to be done:
 
-Add the order state to `app/views/orders/show.html.haml`.
+At the very least, the two new files we just created should show up under the *Untracked files* heading. You can tell git to track those files by entering `git add Procfile config` (git will then add all unadded files in the config directory). If you have other files that need to be tracked, add them the same way.
 
-The orders index page shows "Mark Paid" and "Mark Completed" buttons even in situations where clicking those buttons would cause an error. Update the UI so it only shows the buttons in the appropriate state. (Hint: you may have some records in your DB where the paid and/or completed dates are set even though the order is in the "new" state. Make sure your view deals with that, and doesn’t blow up even if the dates are out of sync with the state.)
+Now you're ready to run `git commit -a`, which will commit all your pending changes to the git repository. You'll be prompted to enter a message. Something like *Ready to push to Heroku* would probably make sense.
+
+### Creating the app in Heroku, and pushing our code
+
+Time to go live!
+
+First, run `heroku create` to let Heroku know that we have a new app to deploy. Note the random app name & URL Heroku supplies (those can be changed, if you want). That command will also give us a new git remote called *heroku*.
+
+Push the code from our repository to the app: `git push heroku yourbranch:master`, where *yourbranch* is the name of the branch you're on. You can find that out from `git branch`. Heroku will show you what it's doing while the deploy is running. This usually takes a minute or two.
+
+Once the deploy has succeeded, we need to run migrations on Heroku to create the initial database. Do this via `heroku run rake db:migrate`.
+
+Your app should finally be ready. Either run `heroku open` to see the app in your default browser (at least on OS X), or just enter the custom URL into your browser. If you've forgotten it, `heroku info` will display the URL, along with some other information.
+
+### Fixing the path to the sprites
+
+Almost everything should look good, except that the navigation images aren't showing up. To fix this, open up `app/assets/stylesheets/application.css.scss`. Change the *background* lines referring to *sprite.png* so that they use Rails's image-path helper, eg. `background: url(image-path('sprite.png')) no-repeat 8px -21px #ddd;`. Then commit the change (`git commit -a` again), and use the same `git push` command you used before. Reload the Heroku app, and the images should be working.
+
+### Additional challenges
+ * Heroku offers a huge number of additional services, via [add-ons](https://addons.heroku.com/). One very useful add-on is New Relic, which keeps track of performance and errors. Try out the free version (options go up to $1649/month, so don't pick the wrong one by mistake!)
+ * The shop manager would like to be notified of every new order. Let's modify the Order *create* method to send an email notification on every successful call (see [the Action Mailer guide for help](http://guides.rubyonrails.org/action_mailer_basics.html)). For now, you could just have the emails delivered to your own account.
+ * A problem with sending email as part of a web request is that it can make the response quite a bit slower. In production apps, we handle this by adding emails to a background process, instead of sending them directly from our controllers. There are a few ways to do this, but one of the simplest is [Delayed Job](https://devcenter.heroku.com/articles/delayed-job). Note that actually running Delayed Job on Heroku will require adding a Heroku *worker process*. You should be able to turn a worker process on briefly to verify that everything's working, but leaving a worker process running will cause Heroku to bill you!
 
 ----
 
@@ -486,3 +459,140 @@ You may find [the Devise homepage](https://github.com/plataformatec/devise) help
  * Right now, users can sign in, but then there's no way to sign out. When a user is logged in, display a link in the header that will sign them out.
  * When someone is logged in, display their email address. This could be put in the same place as the 'sign out' link from the previous step.
  * What would it take to configure devise so that people can't create their own accounts? If you make that change, how will the shop create accounts for new employees?
+
+## Exercise Set 9
+
+The bike shop is sick of deadbeat customers who don’t pay for work, and careless employees messing with paid & completed dates in the admin interface. The shop has decided on some new policies:
+
+1. Employees cannot edit `paid_for_on` and `completed_on` directly. Instead, when they click "Mark Paid" or "Mark Completed," it uses the current date.
+2. Each of those dates can only be set once, and then it can’t be changed.
+3. Orders must be paid up front. The work cannot be completed until the order is paid.
+
+### Prevent direct editing of dates
+
+Merge this branch into you current work. If you haven't already added the upstream:
+
+    git remote add upstream https://github.com/gosmartfactory/ruby-on-rails-exercises.git
+
+Then:
+
+    git fetch upstream
+    git merge upstream/exercise_9_setup
+
+This adds some new tests to `test/controllers/orders_controller_test.rb`. Take a look at that file. What do the new tests do?
+
+Run `rake test`. You will see that two of the tests are failling. That is because the controller allows the new and create actions to directly modify `paid_for_on` and `completed_on`. Change the controller so that it refuses to accept those parameters, and the tests pass.
+
+Please note that **the controller tests are already correct, and you should not modify them**. It is the controller, not the tests, that you need to fix.
+
+The order form still shows an editable field for `paid_for_on`. The controller won’t accept that any more, so delete the field from the UI.
+
+When you get to this point, **stop** and check with your neighbor. If they’re still working on this phase of the exercise, show them what you did. Only proceed when you both have it working!
+
+### Create the order state machine
+
+We’ve implemented new requirement 1. We could implement 2 and 3 with controller logic, but we’re going to take a more robust approach. It’s slight overkill for this immediate problem, but demonstrates a good approach when problems get complex.
+
+We will add a new `state` field to orders. This is not user-editable; instead, it is governed by a state machine, which controls the order lifecycle. Orders start out in the `new` state, then transition to `paid`, then `completed` — always in that order, never going back.
+
+There is a nice gem that adds state machine behavior to Rails. Add it to `Gemfile`:
+
+    gem 'state_machine'
+
+…and run `bundle install`. Now add a new migration to the project, with this content in the `change` method:
+
+    add_column :orders, :state, :string, null: false, default: 'new'
+
+Migrate your db. Orders now have states. The migration has set them all to new, which isn't necessarily correct: some of them may already have paid for and/or completed on dates. If this were production data, you’d have to clean that up — but it isn’t, so don’t worry about it!
+
+Now add state machine rules to `app/models/order.rb`:
+
+    state_machine :state, initial: :new do
+      state :new
+      state :paid
+      state :completed
+      
+      event :pay do
+        transition :new => :paid
+      end
+      
+      event :complete do
+        transition :paid => :completed
+      end
+      
+      after_transition any => :paid do |order|
+        order.paid_for_on = Time.now
+        order.save!
+      end
+      
+      after_transition any => :completed do |order|
+        order.completed_on = Time.now
+        order.save!
+      end
+    end
+
+Read through this chunk of code. Note that even though it is code, it’s quite possible to make sense of it — even if you’re unfamiliar with this particular gem. That’s the power of Ruby’s metaprogramming: the language has gained a new purpose-specific syntax for state machines, and your code stays elegant.
+
+This state machine declaration adds a bunch of new methods to orders. You can now say `order.paid?` to test whether it is in the paid state. You can say `order.pay!` to cause a transition to the paid state — and that will throw an exception if the order is already paid or completed, because the rules only allow a transition from new to paid. For more info, read the [state_machine docs](https://github.com/pluginaweek/state_machine).
+
+### Enforce the new rules
+
+You are now ready to implement the remaining requirements.
+
+You will find a commented-out test in `test/controllers/orders_controller_test.rb`. Uncomment it. It will fail.
+
+Change the `mark_paid` and `mark_completed` methods in `app/controllers/orders_controller.rb` so that they do _not_ directly set any dates, but instead use trigger state machine events to make the changes. (Hint #1: look at the two `event` declarations in the state machine. Hint #2: state machine events trigger a save, so you don’t have to explicitly save the order if you do it right.)
+
+Once you’ve made that change successfully, the tests will all pass.
+
+### Update the UI
+
+Add the order state to `app/views/orders/show.html.haml`.
+
+The orders index page shows "Mark Paid" and "Mark Completed" buttons even in situations where clicking those buttons would cause an error. Update the UI so it only shows the buttons in the appropriate state. (Hint: you may have some records in your DB where the paid and/or completed dates are set even though the order is in the "new" state. Make sure your view deals with that, and doesn’t blow up even if the dates are out of sync with the state.)
+
+When you get to this point, **stop** and check with your neighbor. If they’re still working on this phase of the exercise, show them what you did. Only proceed when you both have it working!
+
+### Create the order state machine
+
+We’ve implemented new requirement 1. We could implement 2 and 3 with controller logic, but we’re going to take a more robust approach. It’s slight overkill for this immediate problem, but demonstrates a good approach when problems get complex.
+
+We will add a new `state` field to orders. This is not user-editable; instead, it is governed by a state machine, which controls the order lifecycle. Orders start out in the `new` state, then transition to `paid`, then `completed` — always in that order, never going back.
+
+There is a nice gem that adds state machine behavior to Rails. Add it to `Gemfile`:
+
+    gem 'state_machine'
+
+…and run `bundle install`. Now add a new migration to the project, with this content in the `change` method:
+
+    add_column :orders, :state, :string, null: false, default: 'new'
+
+Migrate your db. Orders now have states. The migration has set them all to new, which isn't necessarily correct: some of them may already have paid for and/or completed on dates. If this were production data, you’d have to clean that up — but it isn’t, so don’t worry about it!
+
+Now add state machine rules to `app/models/order.rb`:
+
+```ruby
+state_machine :state, initial: :new do
+  state :new
+  state :paid
+  state :completed
+
+  event :pay do
+    transition :new => :paid
+  end
+
+  event :complete do
+    transition :paid => :completed
+  end
+
+  after_transition any => :paid do |order|
+    order.paid_for_on = Time.now
+    order.save!
+  end
+
+  after_transition any => :completed do |order|
+    order.completed_on = Time.now
+    order.save!
+  end
+end
+```
