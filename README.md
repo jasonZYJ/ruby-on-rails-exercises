@@ -55,7 +55,7 @@ Challenges:
 
  * Look for other things in your app that can be refactored.
  * Add controller tests that make sure that your refactoring works. See the [Rails view testing guide](http://guides.rubyonrails.org/testing.html#testing-views) for help.
- * Difficult: Use Ruby metaprogramming to make your partial accept only the name of the model as symbol (e.g. `:brand`), and fetch the appropriate object and edit path itself.
+ * Difficult: Use Ruby metaprogramming to make your partial accept only the model object (e.g. `object: brand`), and fetch the appropriate edit path itself.
 
 ----
 
