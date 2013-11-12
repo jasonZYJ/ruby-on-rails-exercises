@@ -24,3 +24,6 @@
 .field
   = f.label :price
   = f.text_field :price
+.field
+  = f.label :assigned_to
+  = collection_select :order, :assigned_to_id, Employee.all.order(:email), :id, :email, prompt: true

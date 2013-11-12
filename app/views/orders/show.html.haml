@@ -24,6 +24,10 @@
 %p
   %b Completed on:
   = admin_date_format @order.completed_on
+- if @order.assigned_to
+  %p
+    %b Assigned to:
+    = @order.assigned_to.email
 
 = link_to 'Edit', edit_order_path(@order)
 \|

@@ -6,6 +6,9 @@
     = javascript_include_tag "application", "data-turbolinks-track" => true
     = csrf_meta_tags
   %body
+    - if current_employee
+      = pluralize(current_employee.assigned_orders.paid.unfinished.count, 'order')
+      ready and assigned to you
     %div.wrapper
       %header
         %ul
