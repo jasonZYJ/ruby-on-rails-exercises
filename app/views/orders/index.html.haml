@@ -29,4 +29,4 @@
             = link_to 'Mark Completed', order_mark_completed_path(order), method: :post, data: { :confirm => 'Are you sure?' }, :class => 'button'
           - elsif order.completed_on?
             = admin_date_format order.completed_on
-        = render 'shared/index_row_buttons', object: order, edit_path: edit_order_path(order)
+        = render 'shared/index_row_buttons', object: order
