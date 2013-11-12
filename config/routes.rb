@@ -7,6 +7,7 @@ Bikeshop::Application.routes.draw do
   resources :frames
 
   resources :orders do
+    get 'assigned', on: :collection
     post 'mark_paid'
     post 'mark_completed'
   end

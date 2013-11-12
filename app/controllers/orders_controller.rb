@@ -1,10 +1,16 @@
 class OrdersController < ApplicationController
   before_action :set_order, only: [:show, :edit, :update, :destroy]
+  include ApplicationHelper
 
   # GET /orders
   # GET /orders.json
   def index
     @orders = Order.all.order(:completed_on, :created_at)
+  end
+
+  def assigned
+    @orders = assigned_orders
+    render :index
   end
 
   # GET /orders/1
