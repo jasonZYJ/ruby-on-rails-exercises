@@ -10,6 +10,7 @@ class Order < ActiveRecord::Base
   
   belongs_to :frame
   has_one :brand, through: :frame
+  belongs_to :assigned_to, class_name: 'Employee'
 
   def brand_id
     brand ? brand.id : nil
